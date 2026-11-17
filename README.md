@@ -1,5 +1,8 @@
 # pi-escape-guard
 
+[![npm version](https://img.shields.io/npm/v/pi-escape-guard)](https://www.npmjs.com/package/pi-escape-guard)
+[![Tests](https://github.com/Buchi-dev-dzn/pi-escape-guard/actions/workflows/test.yml/badge.svg)](https://github.com/Buchi-dev-dzn/pi-escape-guard/actions/workflows/test.yml)
+
 Prevent accidental interruptions in [Pi](https://pi.dev). Press **Esc three times** to interrupt an active agent operation, instead of stopping it with a single accidental press.
 
 The counter stays hidden until you press Esc. All on-screen instructions and notifications are in English.
@@ -42,9 +45,10 @@ The extension preserves Pi's native interrupt behavior, including restoring queu
 
 No build step or runtime dependency installation is required. Pi loads `index.ts` directly and provides the host APIs declared in `peerDependencies`.
 
-With a global npm installation of `@earendil-works/pi-coding-agent`:
+Tests require Node.js 22.19+ and a global npm installation of Pi. CI tests Node.js 22, 24, and 26 with Pi 1.5.2:
 
 ```sh
+npm install --global @earendil-works/pi-coding-agent@1.5.2
 npm test
 npm pack --dry-run
 ```
@@ -58,6 +62,18 @@ pi -e ./index.ts
 ```
 
 Disable any installed copy first to avoid duplicate input handlers.
+
+## Contributing
+
+Bug reports and focused pull requests are welcome. When reporting an input issue, include your Pi version, Node.js version, terminal application, and whether Kitty keyboard protocol is enabled. Do not include API keys or private session content.
+
+Run `npm test` and `npm pack --dry-run` before submitting changes. Keep the extension free of runtime dependencies and preserve native idle key behavior.
+
+## Links
+
+- [npm package](https://www.npmjs.com/package/pi-escape-guard)
+- [Source and issues](https://github.com/Buchi-dev-dzn/pi-escape-guard)
+- [Releases](https://github.com/Buchi-dev-dzn/pi-escape-guard/releases)
 
 ## License
 

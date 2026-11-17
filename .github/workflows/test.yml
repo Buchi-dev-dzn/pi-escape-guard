@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install tested Pi host
+        run: npm install --global @earendil-works/pi-coding-agent@1.5.2
+      - name: Test extension and native loader
+        run: npm test
+      - name: Check package contents
+        run: |
+          npm pack --dry-run --json --ignore-scripts > "$RUNNER_TEMP/pack.json"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const [pack] = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/pack.json`, 'utf8'));
+          assert.deepEqual(
+            pack.files.map(file => file.path).sort(),
+            ['CHANGELOG.md', 'LICENSE', 'README.md', 'index.ts', 'package.json'],
+          );
+          console.log(`Verified ${pack.id}: ${pack.files.length} publishable files`);
+          JS

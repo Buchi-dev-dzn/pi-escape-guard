@@ -5,6 +5,14 @@
   "type": "module",
   "license": "MIT",
   "author": "Buchi-dev-dzn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Buchi-dev-dzn/pi-escape-guard.git"
+  },
+  "homepage": "https://github.com/Buchi-dev-dzn/pi-escape-guard#readme",
+  "bugs": {
+    "url": "https://github.com/Buchi-dev-dzn/pi-escape-guard/issues"
+  },
   "keywords": [
     "pi-package",
     "pi-extension",
