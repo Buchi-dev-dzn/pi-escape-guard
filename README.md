@@ -31,13 +31,15 @@ Esc: 1/3 — Press Esc 3 times to interrupt (within 1s of each press)
 - The widget disappears and the counter resets after one second without another press, another key, the end of an agent run, or a session switch.
 - Nothing is displayed before the first Esc press.
 - Idle Esc behavior and Ctrl+C remain unchanged.
+- Esc in `/resume`, other selectors, dialogs, and autocomplete dismisses those interfaces normally without counting an interrupt.
 
 The extension preserves Pi's native interrupt behavior, including restoring queued messages to the editor.
 
 ## Scope and limitations
 
 - Protection applies when `ctx.isIdle()` is false, including agent processing and automatic retries. Standalone `!` shell commands while the agent is idle and direct aborts from other extensions are not protected.
-- Esc is intercepted at the terminal input layer during active operations. Dismissing a dialog shown during an operation may also require three presses. The third press goes to the currently focused component; it does not bypass a dialog to abort the agent.
+- Protection applies only while the main editor has focus and its autocomplete menu is closed. Opening a selector or dialog and pressing a key clears any pending interrupt count.
+- Existing custom editor factories are preserved. Custom editors that do not expose a `focused` property bypass the guard to avoid intercepting unrelated UI actions. An editor factory installed by another extension after Escape Guard may also bypass protection.
 - Kitty key-release and held-key repeat events do not count. Terminals that do not report repeats cannot distinguish holding Esc from pressing it repeatedly.
 - Non-interactive sessions are unaffected.
 

@@ -1,5 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { isKeyRelease, isKeyRepeat, matchesKey } from "@earendil-works/pi-tui";
+
+type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
 
 const REQUIRED_PRESSES = 3;
 const INTERVAL_MS = 1000;
@@ -9,6 +11,8 @@ const WIDGET = "escape-guard";
 export default function escapeGuard(pi: ExtensionAPI) {
   let context: ExtensionContext | undefined;
   let unsubscribe: (() => void) | undefined;
+  let restoreEditor: (() => void) | undefined;
+  let activeEditor: ReturnType<EditorFactory> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let presses = 0;
   let lastPress = 0;
@@ -30,13 +34,34 @@ export default function escapeGuard(pi: ExtensionAPI) {
 
   pi.on("session_start", (_event, ctx) => {
     unsubscribe?.();
+    unsubscribe = undefined;
+    restoreEditor?.();
+    restoreEditor = undefined;
     reset();
     context = ctx;
     if (!ctx.hasUI) return;
 
+    // The public getter returns a factory, not the live editor. Wrap that
+    // factory to retain the instance whose focus Pi updates for native menus.
+    const previousFactory = ctx.ui.getEditorComponent();
+    const factory: EditorFactory = (...args) => {
+      activeEditor = previousFactory ? previousFactory(...args) : new CustomEditor(...args);
+      return activeEditor;
+    };
+    restoreEditor = () => {
+      // Do not overwrite an editor installed by another extension after us.
+      if (ctx.ui.getEditorComponent() === factory) ctx.ui.setEditorComponent(previousFactory);
+      activeEditor = undefined;
+    };
+    ctx.ui.setEditorComponent(factory);
+
     unsubscribe = ctx.ui.onTerminalInput((data) => {
-      // Do not change idle editor / menu behavior, or count Kitty key-up events.
-      if (ctx.isIdle()) {
+      // Native selectors (/resume, /tree), dialogs and autocomplete own Esc
+      // while open. Fail open for custom editors that do not expose focus.
+      const editorFocused = activeEditor && "focused" in activeEditor && activeEditor.focused === true;
+      const autocompleteOpen = activeEditor && "isShowingAutocomplete" in activeEditor
+        && typeof activeEditor.isShowingAutocomplete === "function" && activeEditor.isShowingAutocomplete();
+      if (ctx.isIdle() || !editorFocused || autocompleteOpen) {
         reset();
         return;
       }
@@ -82,6 +107,8 @@ export default function escapeGuard(pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     unsubscribe?.();
     unsubscribe = undefined;
+    restoreEditor?.();
+    restoreEditor = undefined;
     reset();
     context = undefined;
   });

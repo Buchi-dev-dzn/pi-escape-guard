@@ -1,6 +1,6 @@
 {
   "name": "pi-escape-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Prevent accidental Pi interruptions by requiring three consecutive Esc presses, with an on-demand counter.",
   "type": "module",
   "license": "MIT",

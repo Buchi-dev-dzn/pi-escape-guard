@@ -13,12 +13,13 @@ const { createJiti } = await import(pathToFileURL(path.join(root, "dist/core/ext
 const jiti = createJiti(import.meta.url, {
   moduleCache: false,
   alias: {
+    "@earendil-works/pi-coding-agent": path.join(root, "dist/index.js"),
     "@earendil-works/pi-tui": path.join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
   },
 });
 const install = await jiti.import(fileURLToPath(new URL("./index.ts", import.meta.url)), { default: true });
 
-function harness(t, { hasUI = true } = {}) {
+function harness(t, { hasUI = true, existingFactory } = {}) {
   t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 10000 });
   const events = new Map();
   const widgets = new Map();
@@ -26,10 +27,18 @@ function harness(t, { hasUI = true } = {}) {
   let input;
   let idle = false;
   let subscriptions = 0;
+  let editorFactory = existingFactory;
+  let editor = { focused: true };
   const ctx = {
     hasUI,
     isIdle: () => idle,
     ui: {
+      getEditorComponent: () => editorFactory,
+      setEditorComponent: (factory) => {
+        editorFactory = factory;
+        editor = factory?.({ requestRender() {} }, { borderColor: (s) => s }, undefined);
+        if (editor && "focused" in editor) editor.focused = true;
+      },
       setWidget: (key, value) => widgets.set(key, value),
       notify: (message) => notifications.push(message),
       onTerminalInput: (fn) => {
@@ -46,6 +55,10 @@ function harness(t, { hasUI = true } = {}) {
     emit,
     input: (data = "\x1b") => input?.(data),
     idle: (value) => { idle = value; },
+    focus: (value) => { editor.focused = value; },
+    autocomplete: (value) => { editor.isShowingAutocomplete = () => value; },
+    editorFactory: () => editorFactory,
+    replaceFactory: (factory) => ctx.ui.setEditorComponent(factory),
     widget: () => widgets.get("escape-guard")?.join("\n"),
     notifications,
     subscriptions: () => subscriptions,
@@ -135,6 +148,72 @@ test("agent boundaries, session switch, reload and shutdown clean up", (t) => {
   h.emit("session_shutdown");
   assert.equal(h.subscriptions(), 0);
   assert.equal(h.widget(), undefined);
+});
+
+test("resume and other selectors receive Esc without a counter or interrupt notification", (t) => {
+  const h = harness(t);
+  h.focus(false); // Pi transfers focus from the editor to the native selector.
+  for (let i = 0; i < 3; i += 1) assert.equal(h.input(), undefined);
+  assert.equal(h.widget(), undefined);
+  assert.deepEqual(h.notifications, []);
+  h.focus(true);
+  assert.deepEqual(h.input(), { consume: true });
+  assert.match(h.widget(), /1\/3/);
+});
+
+test("opening a selector during a burst clears its count before dismissing it", (t) => {
+  const h = harness(t);
+  h.input();
+  h.input();
+  assert.match(h.widget(), /2\/3/);
+  h.focus(false);
+  assert.equal(h.input(), undefined);
+  assert.equal(h.widget(), undefined);
+  assert.deepEqual(h.notifications, []);
+  h.focus(true);
+  assert.deepEqual(h.input(), { consume: true });
+  assert.match(h.widget(), /1\/3/);
+});
+
+test("Esc dismisses autocomplete without counting an interrupt", (t) => {
+  const h = harness(t);
+  h.input();
+  h.autocomplete(true);
+  for (let i = 0; i < 3; i += 1) assert.equal(h.input(), undefined);
+  assert.equal(h.widget(), undefined);
+  assert.deepEqual(h.notifications, []);
+  h.autocomplete(false);
+  assert.deepEqual(h.input(), { consume: true });
+  assert.match(h.widget(), /1\/3/);
+});
+
+test("existing custom editor factory is preserved across reload and restored on shutdown", (t) => {
+  let created = 0;
+  const existingFactory = () => { created += 1; return { focused: false }; };
+  const h = harness(t, { existingFactory });
+  assert.equal(created, 1);
+  assert.deepEqual(h.input(), { consume: true });
+  h.emit("session_start");
+  assert.equal(h.subscriptions(), 1);
+  assert.deepEqual(h.input(), { consume: true });
+  assert.match(h.widget(), /1\/3/);
+  h.emit("session_shutdown");
+  assert.equal(h.editorFactory(), existingFactory);
+});
+
+test("custom editors without focus information do not swallow Esc", (t) => {
+  const h = harness(t, { existingFactory: () => ({}) });
+  for (let i = 0; i < 3; i += 1) assert.equal(h.input(), undefined);
+  assert.deepEqual(h.notifications, []);
+  assert.equal(h.widget(), undefined);
+});
+
+test("shutdown does not replace an editor installed later by another extension", (t) => {
+  const h = harness(t);
+  const laterFactory = () => ({ focused: true });
+  h.replaceFactory(laterFactory);
+  h.emit("session_shutdown");
+  assert.equal(h.editorFactory(), laterFactory);
 });
 
 test("Pi's native loader accepts the extension and registers its lifecycle hooks", async () => {
