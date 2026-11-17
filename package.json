@@ -1,0 +1,35 @@
+{
+  "name": "pi-escape-guard",
+  "version": "0.1.0",
+  "description": "Prevent accidental Pi interruptions by requiring three consecutive Esc presses, with an on-demand counter.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Buchi-dev-dzn",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "escape",
+    "interrupt",
+    "guard"
+  ],
+  "files": [
+    "index.ts",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "scripts": {
+    "test": "node --test escape-guard.test.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
